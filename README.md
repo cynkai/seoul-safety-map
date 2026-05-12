@@ -1,16 +1,22 @@
-# university
-
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+서울시 안전 시설 지도 서비스
+    
+    서울시 Open API를 활용하여 주변 안전 시설을 지도 기반으로 조회할 수 있는 Flutter 앱입니다.
+    
+    주요 기능
+    - 서울시 안전 시설 데이터 실시간 조회 (Open API)
+    - 사용자 위치 기반 반경 검색
+    - 시설 유형별 필터링
+    - 지도 기반 시각화
+    
+    사용 기술
+    - Flutter / Dart
+    - 서울시 Open API
+    - 위치 기반 서비스 (GPS)
+    
+    역할
+    - 프론트엔드 개발 담당 (지도 UI 구현 및 API 연동)
+    
+    프로젝트 배경
+    졸업작품으로 제작한 프로젝트입니다.
+    기존 서비스에서는 공원, 병원 등 안전 시설이 통합 제공되지 않아
+    사용자가 한눈에 확인하기 어려웠던 문제를 해결하고자 했습니다.
