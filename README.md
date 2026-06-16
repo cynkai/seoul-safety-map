@@ -10,15 +10,32 @@
     - 시설 유형별 필터링
     - 지도 기반 시각화
     
-    사용 기술
-    - Flutter / Dart
-    - 서울시 Open API
-    - 위치 기반 서비스 (GPS)
+    ## Tech Stack
+
+### Frontend
+- Flutter
+- Dart
+
+### API
+- Seoul Open API
+
+### Location
+- GPS / Location Service
+
+  ## Screenshot
+
+![main](flutter_01.png)
     
-    역할
-    - 프론트엔드 개발 담당 (지도 UI 구현 및 API 연동)
+   ## My Role
+
+- Implemented Flutter-based mobile UI
+- Integrated Seoul Open API
+- Implemented map visualization features
+- Developed GPS-based search functionality
     
     프로젝트 배경
     졸업작품으로 제작한 프로젝트입니다.
     기존 서비스에서는 공원, 병원 등 안전 시설이 통합 제공되지 않아
     사용자가 한눈에 확인하기 어려웠던 문제를 해결하고자 했습니다.
+
+
