@@ -1,4 +1,6 @@
-서울시 안전 시설 지도 서비스
+# Seoul Safety Facility Map
+
+서울시 Open API 기반 안전시설 위치 시각화 서비스
     
     서울시 Open API를 활용하여 주변 안전 시설을 지도 기반으로 조회할 수 있는 Flutter 앱입니다.
     
