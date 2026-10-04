@@ -21,6 +21,12 @@ Map<PoiType, List<NearbyPoi>> nearestByType(
   final byType = <PoiType, List<NearbyPoi>>{};
   for (final item in items) {
     if (!types.contains(item.type)) continue;
+    // Only emergency bells and CCTV are worth heading to; skip streetlights,
+    // road markings and signs.
+    if (item.type == PoiType.safeRoute &&
+        !emergencySafeFacilityCodes.contains((item.extra?['FACI_CODE'] ?? '').toString().trim())) {
+      continue;
+    }
     final meters = _distance.as(LengthUnit.Meter, from, item.point);
     (byType[item.type] ??= []).add(NearbyPoi(item, meters));
   }

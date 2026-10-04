@@ -451,8 +451,9 @@ class MapVm extends ChangeNotifier {
       case PoiType.er:
         return ((row['DUTYNAME'] ?? '응급실').toString().trim()).ifEmpty('응급실');
       case PoiType.safeRoute:
-        return ((row['ASG_NM'] ?? row['FACI_ID'] ?? '안심귀갓길').toString().trim())
-            .ifEmpty('안심귀갓길');
+        final route = (row['ASG_NM'] ?? '').toString().trim();
+        final facility = safeFacilityName(row);
+        return route.isEmpty ? facility : '$facility · $route';
     }
   }
 

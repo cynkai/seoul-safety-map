@@ -236,7 +236,10 @@ class _MapPageState extends State<MapPage> {
             for (final entry in groups.entries) ...[
               Padding(
                 padding: const EdgeInsets.only(top: 16, bottom: 4),
-                child: Text(entry.key.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  entry.key == PoiType.safeRoute ? '안심귀갓길 안심벨·CCTV' : entry.key.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
               for (final near in entry.value)
                 ListTile(
@@ -1022,6 +1025,7 @@ class _MapPageState extends State<MapPage> {
     }
 
     final lines = <String>[
+      '시설: ${safeFacilityName(r)}',
       '귀갓길명: ${pick(r['ASG_NM']).isNotEmpty ? pick(r['ASG_NM']) : item.title}',
       if (pick(r['SGG_NAME']).isNotEmpty) '시군구: ${pick(r['SGG_NAME'])}',
       if (pick(r['EMD_NM']).isNotEmpty) '읍면동: ${pick(r['EMD_NM'])}',
