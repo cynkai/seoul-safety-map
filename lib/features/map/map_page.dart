@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'map_vm.dart';
 import 'models.dart';
+import 'nearest.dart';
 
 const List<String> seoulGuList = [
   '강남구',
@@ -193,6 +194,79 @@ class _MapPageState extends State<MapPage> {
     _mapController.move(myLocation, _zoom);
   }
 
+  /// Lists the closest facilities of each type to the current location,
+  /// regardless of the radius and type filters, with a directions link.
+  Future<void> _showNearest() async {
+    final vm = widget.vm;
+    final from = vm.myLocation;
+    if (from == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('현재 위치를 알 수 없어 가까운 시설을 찾을 수 없습니다.')),
+      );
+      return;
+    }
+    final groups = nearestByType(vm.allItems, from);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        builder: (_, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            const Text(
+              '지금 가장 가까운 안전시설',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '현재 위치에서 직선거리 기준입니다. 반경·유형 필터와 관계없이 전체 시설에서 찾습니다.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+            if (groups.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: Text('불러온 시설이 없습니다.'),
+              ),
+            for (final entry in groups.entries) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 16, bottom: 4),
+                child: Text(entry.key.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              for (final near in entry.value)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(near.item.title),
+                  subtitle: Text([
+                    formatDistance(near.meters),
+                    if (near.item.type == PoiType.er && near.item.extra != null && vm.erOperating(near.item.extra!))
+                      '응급실 운영',
+                    if ((near.item.address ?? '').isNotEmpty) near.item.address!,
+                  ].join(' · ')),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _mapController.move(near.item.point, 17);
+                    setState(() => _zoom = 17);
+                  },
+                  trailing: IconButton(
+                    tooltip: '길찾기',
+                    icon: const Icon(Icons.directions),
+                    onPressed: () => _openUrl(directionsUri(near.item).toString()),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showRadiusPicker() async {
     final vm = widget.vm;
 
@@ -204,7 +278,7 @@ class _MapPageState extends State<MapPage> {
           child: ListView.separated(
             shrinkWrap: true,
             itemCount: MapVm.radiusOptions.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final km = MapVm.radiusOptions[index];
               final selected = vm.radiusKm == km;
@@ -311,7 +385,7 @@ class _MapPageState extends State<MapPage> {
               ),
               onPositionChanged: (pos, hasGesture) {
                 final z = pos.zoom;
-                if (z != null && z != _zoom) {
+                if (z != _zoom) {
                   setState(() => _zoom = z);
                 }
               },
@@ -319,7 +393,7 @@ class _MapPageState extends State<MapPage> {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.university',
+                userAgentPackageName: 'io.github.cynkai.seoul_safety_map',
               ),
               if (vm.myLocation != null)
                 CircleLayer(
@@ -328,8 +402,8 @@ class _MapPageState extends State<MapPage> {
                       point: vm.myLocation!,
                       radius: vm.radiusKm * 1000,
                       useRadiusInMeter: true,
-                      color: Colors.blue.withOpacity(0.12),
-                      borderColor: Colors.blue.withOpacity(0.55),
+                      color: Colors.blue.withValues(alpha: 0.12),
+                      borderColor: Colors.blue.withValues(alpha: 0.55),
                       borderStrokeWidth: 2,
                     ),
                   ],
@@ -403,6 +477,12 @@ class _MapPageState extends State<MapPage> {
                     hero: 'my_loc',
                     icon: Icons.my_location,
                     onTap: _goMyLocation,
+                  ),
+                  const SizedBox(height: 10),
+                  _fab(
+                    hero: 'nearest',
+                    icon: Icons.near_me,
+                    onTap: _showNearest,
                   ),
                 ],
               ),
@@ -499,9 +579,9 @@ class _MapPageState extends State<MapPage> {
                         ),
                         onPressed: _showRadiusPicker,
                         side: BorderSide(
-                          color: _purple.withOpacity(0.35),
+                          color: _purple.withValues(alpha: 0.35),
                         ),
-                        backgroundColor: _purple.withOpacity(0.08),
+                        backgroundColor: _purple.withValues(alpha: 0.08),
                         labelStyle: const TextStyle(
                           color: _purple,
                           fontWeight: FontWeight.w700,
@@ -686,12 +766,12 @@ class _MapPageState extends State<MapPage> {
     String detail = '';
     String? tel;
     String? url;
-    bool isErOpen = false;
+    bool erOperating = false;
 
     if (item.type == PoiType.er) {
       final r = item.extra ?? {};
       tel = _pickPhone([r['DUTYTEL3'], r['DUTYTEL1']]);
-      isErOpen = r.isNotEmpty ? vm.isErOpenNow(r, DateTime.now()) : false;
+      erOperating = vm.erOperating(r);
       detail = _formatErDetail(item);
     } else if (item.type == PoiType.park) {
       final r = item.extra ?? {};
@@ -717,18 +797,18 @@ class _MapPageState extends State<MapPage> {
               Expanded(
                 child: Text(typeTitle),
               ),
-              if (item.type == PoiType.er && isErOpen)
+              if (item.type == PoiType.er && erOperating)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.15),
+                    color: Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '운영중',
+                    '응급실 운영',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -845,13 +925,13 @@ class _MapPageState extends State<MapPage> {
       if ((item.address ?? '').isNotEmpty) '주소: ${item.address!}',
       if ((r['DUTYEMCLSNAME'] ?? '').toString().trim().isNotEmpty)
         '분류: ${(r['DUTYEMCLSNAME'] ?? '').toString().trim()}',
-      if ((r['DUTYERYN'] ?? '').toString().trim().isNotEmpty)
-        '응급실운영: ${(r['DUTYERYN'] ?? '').toString().trim()}',
+      '응급실 운영: ${widget.vm.erOperating(r) ? '예' : '정보 없음'}',
       if ((r['DUTYTEL1'] ?? '').toString().trim().isNotEmpty)
         '대표전화: ${(r['DUTYTEL1'] ?? '').toString().trim()}',
       if ((r['DUTYTEL3'] ?? '').toString().trim().isNotEmpty)
         '응급실전화: ${(r['DUTYTEL3'] ?? '').toString().trim()}',
       '',
+      '외래 진료시간 (응급실 운영시간이 아닙니다) · 지금 ${widget.vm.isOutpatientOpenNow(r, DateTime.now()) ? '진료 중' : '진료 시간 외'}',
       line(1, '월'),
       line(2, '화'),
       line(3, '수'),
@@ -977,19 +1057,19 @@ class _CurrentCountText extends StatelessWidget {
     final parts = <String>[];
 
     if (vm.showToilet) {
-      parts.add('화장실 ${toiletCnt}개');
+      parts.add('화장실 $toiletCnt개');
     }
 
     if (vm.showPark) {
-      parts.add('공원 ${parkCnt}개');
+      parts.add('공원 $parkCnt개');
     }
 
     if (vm.showEr) {
-      parts.add('응급실 ${erCnt}개');
+      parts.add('응급실 $erCnt개');
     }
 
     if (vm.showSafeRoute) {
-      parts.add('안심귀갓길 ${safeRouteCnt}개');
+      parts.add('안심귀갓길 $safeRouteCnt개');
     }
 
     final text = parts.isEmpty

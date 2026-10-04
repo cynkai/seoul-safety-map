@@ -7,8 +7,8 @@
 
 
     <application
-        android:usesCleartextTraffic="true"
-        android:label="university"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:label="서울 안전시설 지도"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

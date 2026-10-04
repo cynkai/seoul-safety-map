@@ -4,7 +4,14 @@ enum PoiType {
   toilet,
   park,
   er,
-  safeRoute,
+  safeRoute;
+
+  String get title => switch (this) {
+        PoiType.toilet => '공중화장실',
+        PoiType.park => '공원',
+        PoiType.er => '응급실',
+        PoiType.safeRoute => '안심귀갓길',
+      };
 }
 
 class PoiItem {

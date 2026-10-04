@@ -33,6 +33,7 @@ LatLng? _tryDirectLatLng(Map<String, dynamic> row) {
     'COORD_Y',
     'LAT',
     'WGSYPT',
+    'YCRD', // parks (SearchParkInfoService)
     'Y',
     'y',
     'latitude',
@@ -45,6 +46,7 @@ LatLng? _tryDirectLatLng(Map<String, dynamic> row) {
     'COORD_X',
     'LON',
     'WGSXPT',
+    'XCRD',
     'X',
     'x',
     'longitude',
