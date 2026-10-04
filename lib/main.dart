@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'university',
+      title: '서울 안전시설 지도',
       theme: ThemeData(useMaterial3: true),
       home: MapPage(vm: vm),
     );

@@ -1,5 +1,5 @@
-name: university
-description: "A new Flutter project."
+name: seoul_safety_map
+description: "Map of Seoul safety facilities (toilets, ERs, parks, safe-return points) from the Seoul Open API."
 publish_to: 'none'
 
 version: 1.0.0+1

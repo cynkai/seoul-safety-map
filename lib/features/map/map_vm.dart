@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:latlong2/latlong.dart' show Distance;
 
 import '../../core/seoul_api.dart';
 import '../../core/coord_parser.dart';
@@ -49,6 +48,9 @@ class MapVm extends ChangeNotifier {
 
   String _filterCacheKey = '';
   List<PoiItem> _visibleCache = [];
+
+  /// Every loaded facility, regardless of filters.
+  List<PoiItem> get allItems => [...er, ...toilet, ...safeRoute, ...park];
 
   // 서울 판별 함수
   bool isInSeoul(LatLng p) {
@@ -160,7 +162,13 @@ class MapVm extends ChangeNotifier {
     return null;
   }
 
-  bool isErOpenNow(Map<String, dynamic> r, DateTime now) {
+  /// DUTYERYN = '1' means the hospital reports an operating emergency room.
+  bool erOperating(Map<String, dynamic> r) => (r['DUTYERYN'] ?? '').toString().trim() == '1';
+
+  /// DUTYTIME{1..8}S/C are the hospital's outpatient clinic hours (e.g. 09:00
+  /// to 17:00), not emergency room hours. Do not use them to decide whether
+  /// an emergency room is open.
+  bool isOutpatientOpenNow(Map<String, dynamic> r, DateTime now) {
     final idx = now.weekday;
     final start = (r['DUTYTIME${idx}S'] ?? '').toString();
     final close = (r['DUTYTIME${idx}C'] ?? '').toString();
@@ -323,27 +331,12 @@ class MapVm extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Every row of each dataset (about 16,500 in total, 1,000 per request).
       final firstBatch = await Future.wait<List<Map<String, dynamic>>>([
-        api.fetchAllRows(
-          service: 'mgisToiletPoi',
-          limit: 1500,
-          debugPrint: true,
-        ),
-        api.fetchAllRows(
-          service: 'TvEmgcHospitalInfo',
-          limit: 200,
-          debugPrint: true,
-        ),
-        api.fetchAllRows(
-          service: 'SearchParkInfoService',
-          limit: 133,
-          debugPrint: true,
-        ),
-        api.fetchAllRows(
-          service: 'tbSafeReturnItem',
-          limit: 1500,
-          debugPrint: true,
-        ),
+        api.fetchAllRows(service: 'mgisToiletPoi'),
+        api.fetchAllRows(service: 'TvEmgcHospitalInfo'),
+        api.fetchAllRows(service: 'SearchParkInfoService'),
+        api.fetchAllRows(service: 'tbSafeReturnItem'),
       ]);
 
       final toiletRows = firstBatch[0];
@@ -364,24 +357,6 @@ class MapVm extends ChangeNotifier {
       loading = false;
       backgroundLoading = false;
       error = '데이터 로딩 실패: $e';
-      notifyListeners();
-    }
-  }
-
-  Future<void> _loadSafeRouteOnly() async {
-    try {
-      final safeRouteRows = await api.fetchAllRows(
-        service: 'tbSafeReturnItem',
-        limit: 1500,
-        debugPrint: true,
-      );
-
-      safeRoute = _rowsToPoi(safeRouteRows, PoiType.safeRoute);
-      _invalidateVisibleCache();
-    } catch (e) {
-      error = '안심귀갓길 로딩 실패: $e';
-    } finally {
-      backgroundLoading = false;
       notifyListeners();
     }
   }
@@ -476,8 +451,9 @@ class MapVm extends ChangeNotifier {
       case PoiType.er:
         return ((row['DUTYNAME'] ?? '응급실').toString().trim()).ifEmpty('응급실');
       case PoiType.safeRoute:
-        return ((row['ASG_NM'] ?? row['FACI_ID'] ?? '안심귀갓길').toString().trim())
-            .ifEmpty('안심귀갓길');
+        final route = (row['ASG_NM'] ?? '').toString().trim();
+        final facility = safeFacilityName(row);
+        return route.isEmpty ? facility : '$facility · $route';
     }
   }
 

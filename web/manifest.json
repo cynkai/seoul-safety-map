@@ -1,6 +1,6 @@
 {
-    "name": "university",
-    "short_name": "university",
+    "name": "서울 안전시설 지도",
+    "short_name": "안전시설 지도",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
