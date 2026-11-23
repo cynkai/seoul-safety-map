@@ -17,7 +17,6 @@ class MapVm extends ChangeNotifier {
   bool showSafeRoute = true;
 
   bool loading = false;
-  bool backgroundLoading = false;
 
   String? error;
   String? locationError;
@@ -320,40 +319,48 @@ class MapVm extends ChangeNotifier {
   }
 
   Future<void> loadAll() async {
+    if (loading) return;
     loading = true;
-    backgroundLoading = false;
     error = null;
     notifyListeners();
 
-    try {
-      // Every row of each dataset (about 16,500 in total, 1,000 per request).
-      final firstBatch = await Future.wait<List<Map<String, dynamic>>>([
-        api.fetchAllRows(service: 'mgisToiletPoi'),
-        api.fetchAllRows(service: 'TvEmgcHospitalInfo'),
-        api.fetchAllRows(service: 'SearchParkInfoService'),
-        api.fetchAllRows(service: 'tbSafeReturnItem'),
-      ]);
+    final failures = (await Future.wait([
+      _loadDataset(PoiType.toilet, 'mgisToiletPoi', (items) => toilet = items),
+      _loadDataset(PoiType.er, 'TvEmgcHospitalInfo', (items) => er = items),
+      _loadDataset(PoiType.park, 'SearchParkInfoService', (items) => park = items),
+      _loadDataset(PoiType.safeRoute, 'tbSafeReturnItem', (items) => safeRoute = items),
+    ])).nonNulls.toList();
 
-      final toiletRows = firstBatch[0];
-      final erRows = firstBatch[1];
-      final parkRows = firstBatch[2];
-      final safeRouteRows = firstBatch[3];
-
-      toilet = _rowsToPoi(toiletRows, PoiType.toilet);
-      er = _rowsToPoi(erRows, PoiType.er);
-      park = await _rowsToPoiWithGeocode(parkRows, PoiType.park);
-      safeRoute = _rowsToPoi(safeRouteRows, PoiType.safeRoute);
-
-      loading = false;
-      backgroundLoading = false;
-      _invalidateVisibleCache();
-      notifyListeners();
-    } catch (e) {
-      loading = false;
-      backgroundLoading = false;
-      error = '데이터 로딩 실패: $e';
-      notifyListeners();
+    final missingKey = failures.where(
+      (failure) => failure.error is MissingApiKeyException,
+    );
+    if (missingKey.isNotEmpty) {
+      error = missingKey.first.error.toString();
+    } else if (failures.isNotEmpty) {
+      final names = failures.map((failure) => failure.type.title).join(', ');
+      error = '불러오지 못한 시설: $names. 이전에 불러온 시설은 계속 표시됩니다.';
     }
+    loading = false;
+    notifyListeners();
+  }
+
+  Future<({PoiType type, Object error})?> _loadDataset(
+    PoiType type,
+    String service,
+    void Function(List<PoiItem>) replace,
+  ) async {
+    try {
+      final rows = await api.fetchAllRows(service: service);
+      final items = type == PoiType.park
+          ? await _rowsToPoiWithGeocode(rows, type)
+          : _rowsToPoi(rows, type);
+      replace(items);
+    } catch (e) {
+      return (type: type, error: e);
+    }
+    _invalidateVisibleCache();
+    notifyListeners();
+    return null;
   }
 
   Future<List<PoiItem>> _rowsToPoiWithGeocode(

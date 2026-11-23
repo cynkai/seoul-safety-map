@@ -8,6 +8,7 @@ import 'package:seoul_safety_map/features/map/models.dart';
 
 class _TestApi extends SeoulOpenApi {
   final services = <String>[];
+  final responses = <String, Future<List<Map<String, dynamic>>> Function()>{};
 
   _TestApi() : super(apiKey: 'unused');
 
@@ -18,7 +19,8 @@ class _TestApi extends SeoulOpenApi {
     int pageSize = 1000,
   }) async {
     services.add(service);
-    return [];
+    final respond = responses[service];
+    return respond == null ? [] : await respond();
   }
 }
 
@@ -84,6 +86,60 @@ void main() {
     pending.position.complete();
     await ready;
     expect(pending.loading, isFalse);
+  });
+
+  group('facility loading', () {
+    final erRow = {
+      'HPID': 'hospital',
+      'DUTYNAME': '첫 응급실 이름',
+      'DUTYADDR': '서울특별시 중구 삼일대로 231',
+      'WGS84LAT': '37.5665',
+      'WGS84LON': '126.9780',
+    };
+    late _TestApi api;
+    late MapVm facilities;
+
+    setUp(() {
+      api = _TestApi()
+        ..responses['TvEmgcHospitalInfo'] = () async => [erRow];
+      facilities = MapVm(api: api)..addDistrict('중구');
+    });
+    tearDown(() => facilities.dispose());
+
+    test('shows successful datasets before the remaining requests finish', () async {
+      final parks = Completer<List<Map<String, dynamic>>>();
+      api.responses['SearchParkInfoService'] = () => parks.future;
+      api.responses['mgisToiletPoi'] = () async => throw StateError('unavailable');
+
+      final load = facilities.loadAll();
+      await Future<void>.delayed(Duration.zero);
+      expect(facilities.loading, isTrue);
+      expect(facilities.visibleItems.single.title, '첫 응급실 이름');
+
+      parks.complete([]);
+      await load;
+      expect(facilities.loading, isFalse);
+      expect(facilities.error, contains('공중화장실'));
+      expect(facilities.error, isNot(contains('응급실')));
+      expect(facilities.visibleItems.single.title, '첫 응급실 이름');
+    });
+
+    test('keeps prior data after a refresh error and replaces it after recovery', () async {
+      await facilities.loadAll();
+      final original = facilities.visibleItems;
+      api.responses['TvEmgcHospitalInfo'] = () async => throw StateError('offline');
+      await facilities.loadAll();
+      expect(facilities.error, contains('응급실'));
+      expect(facilities.visibleItems.single, same(original.single));
+
+      api.responses['TvEmgcHospitalInfo'] = () async => [
+        {...erRow, 'DUTYNAME': '고친 응급실 이름'},
+      ];
+      await facilities.loadAll();
+      expect(facilities.error, isNull);
+      expect(facilities.visibleItems.single.id, original.single.id);
+      expect(facilities.visibleItems.single.title, '고친 응급실 이름');
+    });
   });
 
   group('district browsing', () {
