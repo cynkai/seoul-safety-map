@@ -26,7 +26,7 @@
 ## 기능
 
 - **4종 시설 지도:** 공중화장실(약 4,400곳), 응급실(77곳), 공원(133곳), 안심귀갓길 시설물(약 11,900개)을 서울시 Open API에서 전부 받아 표시한다.
-- **반경·유형·구 필터:** 현재 위치 기준 500m~30km 반경, 시설 유형, 자치구를 골라 볼 수 있다.
+- **반경·유형·구 필터:** 현재 위치 기준 500m~30km 반경, 시설 유형, 자치구를 골라 볼 수 있다. 위치를 제공할 수 없거나 서울 밖에 있어도 **구 추가**에서 자치구를 선택해 시설을 볼 수 있다.
 - **가장 가까운 안전시설:** 지도 오른쪽의 ↗ 버튼을 누르면 유형별로 가장 가까운 3곳을 직선거리 순으로 보여 준다.
   안심귀갓길 시설은 위급할 때 찾아갈 수 있는 안심벨과 CCTV(약 2,500개)만 고른다. 보안등, 노면표기 같은 시설은 지도에만 나온다.
   항목을 누르면 지도가 그 위치로 이동하고, 길찾기 버튼은 카카오맵 경로를 연다. 반경·유형 필터와 관계없이 전체 시설에서 찾는다.
@@ -101,6 +101,7 @@ lib/
 
 A graduation project: a Flutter map of Seoul's public toilets, emergency rooms, parks and safe-return-route facilities from the Seoul Open API,
 with radius, type and district filters and a "closest safety facilities" sheet that links to Kakao Map directions.
+Choose a district to browse its facilities when location access is unavailable or you are outside Seoul.
 To run it, get a free key from [data.seoul.go.kr](https://data.seoul.go.kr), put `{"SEOUL_API_KEY": "..."}` in `dart_defines.json`, and run
 `flutter run --dart-define-from-file=dart_defines.json`. Emergency-room status comes from `DUTYERYN`; the `DUTYTIME*` fields are outpatient hours.
 

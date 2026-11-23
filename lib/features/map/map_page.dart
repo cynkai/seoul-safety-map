@@ -142,6 +142,7 @@ class _MapPageState extends State<MapPage> {
   final MapController _mapController = MapController();
 
   double _zoom = 13;
+  String? _districtToFocus;
 
   static const Color _purple = Color(0xFF6F42C1);
   static const Color _beige = Color(0xFFEAD8B7);
@@ -169,6 +170,26 @@ class _MapPageState extends State<MapPage> {
   void _onVmChanged() {
     if (!mounted) return;
     setState(() {});
+    _focusDistrictWhenReady();
+  }
+
+  void _focusDistrictWhenReady() {
+    final district = _districtToFocus;
+    if (district == null || widget.vm.loading) return;
+    _districtToFocus = null;
+    final points = widget.vm.visibleItems
+        .where((item) => item.district == district)
+        .map((item) => item.point)
+        .toList();
+    if (points.isNotEmpty) {
+      _mapController.fitCamera(
+        CameraFit.coordinates(
+          coordinates: points,
+          maxZoom: 16,
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
+        ),
+      );
+    }
   }
 
   void _zoomIn() {
@@ -187,6 +208,7 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> _goMyLocation() async {
     await widget.vm.initLocation();
+    if (!mounted) return;
 
     final myLocation = widget.vm.myLocation;
     if (myLocation == null) return;
@@ -312,20 +334,6 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  String get activeDistrictLabel {
-    final vm = widget.vm;
-
-    if (vm.isUserOutsideSeoul && vm.selectedDistricts.isEmpty) {
-      return '현재 서울 지역 아님. 구 추가로 지역을 선택해 주세요.';
-    }
-
-    if (vm.selectedDistricts.isEmpty) {
-      return '선택 구 없음';
-    }
-
-    return '추가된 구: ${vm.selectedDistricts.join(', ')}';
-  }
-
   String _makeMarkerCacheKey(List<PoiItem> items) {
     return items.map((e) => '${e.type.name}_${e.id}').join('|');
   }
@@ -398,7 +406,7 @@ class _MapPageState extends State<MapPage> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'io.github.cynkai.seoul_safety_map',
               ),
-              if (vm.myLocation != null)
+              if (vm.canFilterByRadius)
                 CircleLayer(
                   circles: [
                     CircleMarker(
@@ -538,9 +546,10 @@ class _MapPageState extends State<MapPage> {
                               },
                             );
 
-                            if (selected != null) {
-                              widget.vm.addDistrict(selected);
-                            }
+                            if (!mounted || selected == null) return;
+                            if (!vm.canFilterByRadius) _districtToFocus = selected;
+                            vm.addDistrict(selected);
+                            _focusDistrictWhenReady();
                           },
                           child: Ink(
                             padding: const EdgeInsets.symmetric(
@@ -580,7 +589,7 @@ class _MapPageState extends State<MapPage> {
                         label: Text(
                           '반경 ${widget.vm.radiusLabel(widget.vm.radiusKm)}',
                         ),
-                        onPressed: _showRadiusPicker,
+                        onPressed: vm.canFilterByRadius ? _showRadiusPicker : null,
                         side: BorderSide(
                           color: _purple.withValues(alpha: 0.35),
                         ),
@@ -638,8 +647,13 @@ class _MapPageState extends State<MapPage> {
                           widget.vm.error!,
                           style: const TextStyle(color: Colors.red),
                         ),
+                      if (vm.locationError != null)
+                        Text(
+                          vm.locationError!,
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
                       Text(
-                        activeDistrictLabel,
+                        vm.activeDistrictLabel,
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.black54,
@@ -1076,12 +1090,11 @@ class _CurrentCountText extends StatelessWidget {
       parts.add('안심귀갓길 $safeRouteCnt개');
     }
 
-    final text = parts.isEmpty
-        ? '현재 표시 : 없음 (반경 ${vm.radiusLabel(vm.radiusKm)})'
-        : '현재 표시 : ${parts.join(', ')} (반경 ${vm.radiusLabel(vm.radiusKm)})';
+    final displayed = parts.isEmpty ? '없음' : parts.join(', ');
+    final radius = vm.canFilterByRadius ? ' (반경 ${vm.radiusLabel(vm.radiusKm)})' : '';
 
     return Text(
-      text,
+      '현재 표시 : $displayed$radius',
       style: const TextStyle(
         fontWeight: FontWeight.w700,
       ),
