@@ -20,6 +20,7 @@ class MapVm extends ChangeNotifier {
   bool backgroundLoading = false;
 
   String? error;
+  String? locationError;
 
   LatLng center = const LatLng(37.5665, 126.9780);  // 서울로 고정
   LatLng? myLocation;
@@ -63,18 +64,17 @@ class MapVm extends ChangeNotifier {
     return !isInSeoul(myLocation!);
   }
 
-  // 위치 로딩 후 마커 필터링
+  bool get canFilterByRadius => myLocation != null && !isUserOutsideSeoul;
+
   Future<void> initAndLoad() async {
-    await initLocation();
-    await loadAll();
+    await Future.wait([initLocation(), loadAll()]);
   }
 
   Future<void> initLocation() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        error = '위치 서비스가 꺼져 있습니다.';
-        notifyListeners();
+        _setLocationError('위치 서비스가 꺼져 있습니다.');
         return;
       }
 
@@ -84,29 +84,35 @@ class MapVm extends ChangeNotifier {
       }
 
       if (permission == LocationPermission.denied) {
-        error = '위치 권한이 거부되었습니다.';
-        notifyListeners();
+        _setLocationError('위치 권한이 거부되었습니다.');
         return;
       }
 
       if (permission == LocationPermission.deniedForever) {
-        error = '위치 권한이 영구 거부되었습니다(설정에서 허용 필요).';
-        notifyListeners();
+        _setLocationError('위치 권한이 영구 거부되었습니다. 설정에서 허용할 수 있습니다.');
         return;
       }
 
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
       );
 
       myLocation = LatLng(pos.latitude, pos.longitude);
       center = myLocation!;
+      locationError = null;
       _invalidateVisibleCache();
       notifyListeners();
-    } catch (e) {
-      error = '위치 가져오기 실패: $e';
-      notifyListeners();
+    } catch (_) {
+      _setLocationError('현재 위치를 가져오지 못했습니다.');
     }
+  }
+
+  void _setLocationError(String message) {
+    myLocation = null;
+    locationError = message;
+    _invalidateVisibleCache();
+    notifyListeners();
   }
 
   void setRadiusKm(double km) {
@@ -228,24 +234,13 @@ class MapVm extends ChangeNotifier {
     if (showEr) base.addAll(er);
     if (showSafeRoute) base.addAll(safeRoute);
 
-    if (myLocation == null) {
-      _filterCacheKey = key;
-      _visibleCache = [];
-      return _visibleCache;
-    }
-
-    // 서울 밖이면 마커 표시 안 함
-    if (isUserOutsideSeoul && selectedDistricts.isEmpty) {
-      _filterCacheKey = key;
-      _visibleCache = [];
-      return _visibleCache;
-    }
-
     final inRadius = <PoiItem>[];
-    for (final item in base) {
-      final meters = _distance.as(LengthUnit.Meter, myLocation!, item.point);
-      if (meters <= radiusKm * 1000) {
-        inRadius.add(item);
+    if (canFilterByRadius) {
+      for (final item in base) {
+        final meters = _distance.as(LengthUnit.Meter, myLocation!, item.point);
+        if (meters <= radiusKm * 1000) {
+          inRadius.add(item);
+        }
       }
     }
 
@@ -263,11 +258,11 @@ class MapVm extends ChangeNotifier {
       }
     }
 
-    final seen = <String>{};
+    final seen = <(PoiType, String)>{};
     final merged = <PoiItem>[];
 
     for (final item in [...inRadius, ...extraByDistrict]) {
-      if (seen.add(item.id)) {
+      if (seen.add((item.type, item.id))) {
         merged.add(item);
       }
     }
@@ -316,12 +311,12 @@ class MapVm extends ChangeNotifier {
   }
 
   String get activeDistrictLabel {
-    if (isUserOutsideSeoul && selectedDistricts.isEmpty) {
-      return '현재 서울 지역 아님. 구 추가로 지역을 선택해 주세요.';
+    if (selectedDistricts.isNotEmpty) {
+      return '추가된 구: ${selectedDistricts.join(', ')}';
     }
-
-    if (selectedDistricts.isEmpty) return '선택 구 없음';
-    return '추가된 구: ${selectedDistricts.join(', ')}';
+    if (myLocation == null) return '구 추가로 서울의 시설을 찾아보세요.';
+    if (isUserOutsideSeoul) return '현재 위치가 서울 밖입니다. 구를 추가해 시설을 찾아보세요.';
+    return '선택 구 없음';
   }
 
   Future<void> loadAll() async {
