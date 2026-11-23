@@ -150,7 +150,7 @@ class _MapPageState extends State<MapPage> {
   static const Color _beige = Color(0xFFEAD8B7);
   static const Color _safeRouteBlue = Color(0xFF1976D2);
 
-  String _markerCacheKey = '';
+  List<PoiItem>? _cachedItems;
   List<Marker> _cachedToiletMarkers = [];
   List<Marker> _cachedParkMarkers = [];
   List<Marker> _cachedErMarkers = [];
@@ -336,13 +336,8 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  String _makeMarkerCacheKey(List<PoiItem> items) {
-    return items.map((e) => '${e.type.name}_${e.id}').join('|');
-  }
-
   void _rebuildMarkerCacheIfNeeded(List<PoiItem> items) {
-    final key = _makeMarkerCacheKey(items);
-    if (_markerCacheKey == key) return;
+    if (identical(_cachedItems, items)) return;
 
     final toilet = <Marker>[];
     final park = <Marker>[];
@@ -368,7 +363,7 @@ class _MapPageState extends State<MapPage> {
       }
     }
 
-    _markerCacheKey = key;
+    _cachedItems = items;
     _cachedToiletMarkers = toilet;
     _cachedParkMarkers = park;
     _cachedErMarkers = er;
@@ -635,20 +630,16 @@ class _MapPageState extends State<MapPage> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                      if (widget.vm.backgroundLoading)
-                        const Text(
-                          '안심귀갓길 로딩중',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      if (widget.vm.error != null)
+                      if (vm.error != null) ...[
                         Text(
-                          widget.vm.error!,
+                          vm.error!,
                           style: const TextStyle(color: Colors.red),
                         ),
+                        TextButton(
+                          onPressed: vm.loadAll,
+                          child: const Text('시설 다시 불러오기'),
+                        ),
+                      ],
                       if (vm.locationError != null)
                         Text(
                           vm.locationError!,
